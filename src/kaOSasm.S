@@ -62,7 +62,7 @@ kaOS_Start:
 
 	LDR R0, =RunPt		// Load address of RunPt to R0
 	LDR R0, [R0]		// Load value that pointed by RunPt (address of tcb.sp) to R0
-	LDR SP, [R0]		// Load value that pointed by RunPt (address of tcb.sp) to SP (PSP)
+	LDR SP, [R0]		// Load value that pointed by tcb.sp to SP (PSP)
 	POP {R4-R11}
 	POP {R0-R3, R12}
 

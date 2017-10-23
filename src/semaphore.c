@@ -23,11 +23,11 @@ void sem_signal(sem_t* const sem)
         tcb_t* node = sem->blockedQueue;
         sem->blockedQueue = sem->blockedQueue->previous;
 
-        node->next = RunPt->next;
-        node->previous = RunPt;
+        node->next = RunPt;
+        node->previous = RunPt->previous;
 
-        RunPt->next->previous = node;
-        RunPt->next = node;
+        RunPt->previous->next = node;
+        RunPt->previous = node;
     }
 
     __asm__ volatile("CPSIE I");
