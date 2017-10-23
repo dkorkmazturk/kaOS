@@ -1,6 +1,16 @@
 #include "kaos.h"
+#include "semaphore.h"
 
-Tcb* RunPt = NULL;
+tcb_t* RunPt = NULL;
+
+void SVCaller(void *param0, void* param1, void* param2, const uint8_t SVCall_Number) {
+    if(SVCall_Number == 0)
+        sem_init((sem_t*)param0, (int32_t)param1);
+    else if(SVCall_Number == 1)
+        sem_signal((sem_t*)param0);
+    else if(SVCall_Number == 2)
+        sem_wait((sem_t*)param0);
+}
 
 static void Watchdog_Timer0_Init(void)
 {
@@ -51,7 +61,7 @@ void kaOS_Init(void)
 
 int8_t kaOS_AddThead(void (*thread)(void))
 {
-    Tcb* newThread = malloc(sizeof(Tcb));
+    tcb_t* newThread = malloc(sizeof(tcb_t));
 
     if(newThread == NULL)
         return -1;
@@ -91,4 +101,19 @@ int8_t kaOS_AddThead(void (*thread)(void))
     }
 
     return 0;
+}
+
+void kaOS_SemInit(sem_t* const sem, const int32_t val)
+{
+    __asm__ volatile("SVC 0");
+}
+
+void kaOS_SemSignal(sem_t* const sem)
+{
+    __asm__ volatile("SVC 1");
+}
+
+void kaOS_SemWait(sem_t* const sem)
+{
+    __asm__ volatile("SVC 2");
 }

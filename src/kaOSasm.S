@@ -1,25 +1,32 @@
-#include "kaOS.c"
-
 .thumb
 .syntax unified
 .align 2
 
 .extern RunPt
+.extern SVCall_Number
+
 .global PendSV_Handler
 .global SVCall_Handler
 .global kaOS_Start
+.global sem_init
 
 .text
 
+// SVC #0 ==> Sem_Init
+// SVC #1 ==> Sem_Signal
+// SVC #2 ==> Sem_Wait
+
 .thumb_func
 SVCall_Handler:
-	MRS R0, PSP
-	LDR R1, [R0]
-	LDR R0, [R0, #24]
-	SUB R0, #2
-	LDR R0, [R0]
-	ANDS R0, #0xFF
+	MRS R3, PSP
+	LDR R3, [R3, #24]
+	SUB R3, #2
+	LDR R3, [R3]
+	ANDS R3, #0xFF
 
+	PUSH {LR}
+	BL SVCaller
+	POP {LR}
 	BX LR
 
 .thumb_func

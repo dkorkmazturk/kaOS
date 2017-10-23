@@ -7,17 +7,26 @@
 
 #define STACKSIZE 100
 
-typedef struct Tcb
+typedef struct tcb_t
 {
     uint32_t* sp;
-    struct Tcb* next;
-    struct Tcb* previous;
+    struct tcb_t* next;
+    struct tcb_t* previous;
 
     uint32_t stack[STACKSIZE];
-} Tcb;
+} tcb_t;
+
+typedef struct
+{
+    int32_t sem;
+    tcb_t* blockedQueue;
+} sem_t;
 
 void kaOS_Init(void);
-void kaOS_Start(void)  __attribute__ ( ( flatted, naked ) );
+extern void kaOS_Start(void);
 int8_t kaOS_AddThead(void(*thread)(void));
+void kaOS_SemInit(sem_t* const sem, const int32_t val);
+void kaOS_SemSignal(sem_t* const sem);
+void kaOS_SemWait(sem_t* const sem);
 
-#endif // KAOS_H
+#endif
