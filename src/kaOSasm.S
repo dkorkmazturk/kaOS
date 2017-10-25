@@ -8,13 +8,13 @@
 .global PendSV_Handler
 .global SVCall_Handler
 .global kaOS_Start
-.global sem_init
 
 .text
 
 // SVC #0 ==> Sem_Init
 // SVC #1 ==> Sem_Signal
 // SVC #2 ==> Sem_Wait
+// SVC #3 ==> kaOS_Suspend (Suspend currently running thread, reset SysTick and trigger SysTick interrupt)
 
 .thumb_func
 SVCall_Handler:
