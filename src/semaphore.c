@@ -7,7 +7,7 @@ void sem_init(sem_t* const sem, const int32_t val)
     __asm__ volatile("CPSID I");
 
     sem->sem = val;
-    sem->blockedQueue = NULL;
+    sem->blockedQueue = 0;
 
     __asm__ volatile("CPSIE I");
 }
@@ -44,15 +44,15 @@ void sem_wait(sem_t* const sem)
         RunPt->previous->next = RunPt->next;
         RunPt->next->previous = RunPt->previous;
 
-        RunPt->previous = NULL;
+        RunPt->previous = 0;
 
-        if(sem->blockedQueue == NULL)
+        if(sem->blockedQueue == 0)
             sem->blockedQueue = RunPt;
         else
         {
             tcb_t* node = sem->blockedQueue;
 
-            while(node->previous != NULL)
+            while(node->previous != 0)
                 node = node->previous;
 
             node->previous = RunPt;
