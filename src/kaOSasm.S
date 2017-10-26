@@ -3,7 +3,6 @@
 .align 2
 
 .extern RunPt
-.extern SVCall_Number
 
 .global PendSV_Handler
 .global SVCall_Handler
@@ -14,7 +13,8 @@
 // SVC #0 ==> Sem_Init
 // SVC #1 ==> Sem_Signal
 // SVC #2 ==> Sem_Wait
-// SVC #3 ==> kaOS_Suspend (Suspend currently running thread, reset SysTick and trigger SysTick interrupt)
+// SVC #3 ==> kaOS_Suspend (Reset SysTick and trigger SysTick interrupt)
+// SVC #4 ==> kaOS_Sleep
 
 .thumb_func
 SVCall_Handler:
