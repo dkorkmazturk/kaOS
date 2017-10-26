@@ -23,11 +23,20 @@ void sem_signal(sem_t* const sem)
         tcb_t* node = sem->blockedQueue;
         sem->blockedQueue = sem->blockedQueue->previous;
 
-        node->next = RunPt;
-        node->previous = RunPt->previous;
+        if(RunPt == 0)
+        {
+            RunPt = node;
+            RunPt->previous = RunPt;
+            RunPt->next = RunPt;
+        }
+        else
+        {
+            node->next = RunPt;
+            node->previous = RunPt->previous;
 
-        RunPt->previous->next = node;
-        RunPt->previous = node;
+            RunPt->previous->next = node;
+            RunPt->previous = node;
+        }
     }
 
     __asm__ volatile("CPSIE I");
@@ -41,8 +50,13 @@ void sem_wait(sem_t* const sem)
 
     if(sem->sem < 0)
     {
-        RunPt->previous->next = RunPt->next;
-        RunPt->next->previous = RunPt->previous;
+        if(RunPt == RunPt->next)
+            RunPt->next = 0;
+        else
+        {
+            RunPt->previous->next = RunPt->next;
+            RunPt->next->previous = RunPt->previous;
+        }
 
         RunPt->previous = 0;
 

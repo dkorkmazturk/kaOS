@@ -2,23 +2,8 @@
 #include "kaos.h"
 #include "semaphore.h"
 
-tcb_t* RunPt = NULL;
+tcb_t* RunPt = 0;
 tcb_t* WaitPt = 0;
-
-void SVCaller(void *param0, void* param1, void* param2, const uint8_t SVCall_Number) {
-    if(SVCall_Number == 0)
-        sem_init((sem_t*)param0, (int32_t)param1);
-    else if(SVCall_Number == 1)
-        sem_signal((sem_t*)param0);
-    else if(SVCall_Number == 2)
-        sem_wait((sem_t*)param0);
-    else if(SVCall_Number == 3) {
-        __asm__ volatile("CPSID I");
-        NVIC_ST_CURRENT_R = NVIC_ST_RELOAD_R;
-        NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
-        __asm__ volatile("CPSIE I");
-    }
-}
 
 static void Timer0_Init(const uint32_t period)
 {
@@ -42,10 +27,10 @@ void Timer0_Handler(void)
 
     TIMER0_ICR_R = 1;   // Acknowledge the interrupt
 
-    tcb_t* waitingNodePrev = NULL;
+    tcb_t* waitingNodePrev = 0;
     tcb_t* waitingNode = WaitPt;
 
-    while(waitingNode != NULL)
+    while(waitingNode != 0)
     {
         --(waitingNode->waitTime);
 
@@ -56,19 +41,28 @@ void Timer0_Handler(void)
             else
             {
                 WaitPt = WaitPt->previous;
-                if(WaitPt == NULL)
+                if(WaitPt == 0)
                 {
                     TIMER0_CTL_R &= ~1; // If there is no remaining process that is waiting, it is pointless to use timer, so disable it
                     TIMER0_TAV_R = TIMER0_TAILR_R;
                 }
             }
 
-            waitingNode->next = RunPt->next;
-            waitingNode->previous = RunPt;
-            RunPt->next = waitingNode;
-            waitingNode->next->previous = waitingNode;
+            if(RunPt == 0)
+            {
+                RunPt = waitingNode;
+                RunPt->next = RunPt;
+                RunPt->previous = RunPt;
+            }
+            else
+            {
+                waitingNode->next = RunPt->next;
+                waitingNode->previous = RunPt;
+                RunPt->next = waitingNode;
+                waitingNode->next->previous = waitingNode;
+            }
 
-            if(waitingNodePrev != NULL)
+            if(waitingNodePrev != 0)
                 waitingNode = waitingNodePrev->previous;
             else
                 waitingNode = WaitPt;
@@ -104,7 +98,7 @@ static void SysTick_Init(void)
     NVIC_ST_CTRL_R = 0;
     NVIC_ST_RELOAD_R = 0x00FFFFFF;
     NVIC_ST_CURRENT_R = 0;
-    NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R & 0x00FFFFFF) | 0x20000000;
+    NVIC_SYS_PRI3_R = (NVIC_SYS_PRI3_R & 0x0000FFFF) | 0x20700000;  // Set SysTick interrupt priority 2 and PendSV priority 7
 }
 
 void SysTick_Start(void)
@@ -122,8 +116,10 @@ void SysTick_Handler(void)
 }
 
 void Scheduler(void) {
-    if(RunPt == NULL)
-        __asm__ volatile("WFI");
+    if(RunPt != 0 && RunPt->next == 0)
+        RunPt = 0;
+    while(RunPt == 0)
+        __asm__ volatile("CPSIE I\n\tWFI\n\tCPSID I");
 
     RunPt = RunPt->next;
 }
@@ -139,7 +135,7 @@ int8_t kaOS_AddThead(void (*thread)(void))
 {
     tcb_t* newThread = malloc(sizeof(tcb_t));
 
-    if(newThread == NULL)
+    if(newThread == 0)
         return -1;
 
     newThread->stack[STACKSIZE - 1] = 0x01000000;  // PSR
@@ -162,7 +158,7 @@ int8_t kaOS_AddThead(void (*thread)(void))
     newThread->sp = &(newThread->stack[STACKSIZE - 16]);
     newThread->waitTime = 0;
 
-    if(RunPt == NULL)
+    if(RunPt == 0)
     {
         RunPt = newThread;
         RunPt->next = RunPt;
@@ -202,12 +198,24 @@ void kaOS_Suspend(void)
 
 void kaOS_Sleep(const uint32_t ms)
 {
-    RunPt->previous->next = RunPt->next;
-    RunPt->next->previous = RunPt->previous;
-    RunPt->previous = NULL;
+    __asm__ volatile("SVC 4");
+}
+
+static void SVCall_kaOS_Sleep(const uint32_t ms)
+{
+    __asm__ volatile("CPSID I");
+    if(RunPt == RunPt->next)
+        RunPt->next = 0;
+    else
+    {
+        RunPt->previous->next = RunPt->next;
+        RunPt->next->previous = RunPt->previous;
+    }
+
+    RunPt->previous = 0;
     RunPt->waitTime = ms;
 
-    if(WaitPt == NULL)
+    if(WaitPt == 0)
     {
         WaitPt = RunPt;
         TIMER0_CTL_R |= 1;   // Start Timer0
@@ -216,11 +224,30 @@ void kaOS_Sleep(const uint32_t ms)
     {
         tcb_t* node = WaitPt;
 
-        while(node->previous != NULL)
+        while(node->previous != 0)
             node = node->previous;
 
         node->previous = RunPt;
     }
 
-    kaOS_Suspend();
+    NVIC_ST_CURRENT_R = NVIC_ST_RELOAD_R;
+    NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
+    __asm__ volatile("CPSIE I");
+}
+
+void SVCaller(void *param0, void* param1, void* param2, const uint8_t SVCall_Number) {
+    if(SVCall_Number == 0)
+        sem_init((sem_t*)param0, (int32_t)param1);
+    else if(SVCall_Number == 1)
+        sem_signal((sem_t*)param0);
+    else if(SVCall_Number == 2)
+        sem_wait((sem_t*)param0);
+    else if(SVCall_Number == 3) {
+        __asm__ volatile("CPSID I");
+        NVIC_ST_CURRENT_R = NVIC_ST_RELOAD_R;
+        NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
+        __asm__ volatile("CPSIE I");
+    }
+    else if(SVCall_Number == 4)
+        SVCall_kaOS_Sleep((uint32_t)param0);
 }
