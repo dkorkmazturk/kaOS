@@ -4,8 +4,9 @@
 
 tcb_t* RunPt = 0;
 tcb_t* WaitPt = 0;
+static uint32_t clockFrequency = 0;
 
-static void Timer0_Init(const uint32_t period)
+static inline void Timer0_Init(const uint32_t period)
 {
     SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R0;
 
@@ -18,61 +19,6 @@ static void Timer0_Init(const uint32_t period)
     TIMER0_IMR_R = 1;   // Timeouts will trigger interrupt
 
     NVIC_EN0_R |= (1 << 19);    // Enable 19th IRQ
-}
-
-void Timer0_Handler(void)
-{
-    // Timer0 interrupt handler
-    // Priority 2
-
-    TIMER0_ICR_R = 1;   // Acknowledge the interrupt
-
-    tcb_t* waitingNodePrev = 0;
-    tcb_t* waitingNode = WaitPt;
-
-    while(waitingNode != 0)
-    {
-        --(waitingNode->waitTime);
-
-        if(waitingNode->waitTime == 0)
-        {
-            if(waitingNode != WaitPt)
-                waitingNodePrev->previous = waitingNode->previous;
-            else
-            {
-                WaitPt = WaitPt->previous;
-                if(WaitPt == 0)
-                {
-                    TIMER0_CTL_R &= ~1; // If there is no remaining process that is waiting, it is pointless to use timer, so disable it
-                    TIMER0_TAV_R = TIMER0_TAILR_R;
-                }
-            }
-
-            if(RunPt == 0)
-            {
-                RunPt = waitingNode;
-                RunPt->next = RunPt;
-                RunPt->previous = RunPt;
-            }
-            else
-            {
-                waitingNode->next = RunPt->next;
-                waitingNode->previous = RunPt;
-                RunPt->next = waitingNode;
-                waitingNode->next->previous = waitingNode;
-            }
-
-            if(waitingNodePrev != 0)
-                waitingNode = waitingNodePrev->previous;
-            else
-                waitingNode = WaitPt;
-        }
-        else
-        {
-            waitingNodePrev = waitingNode;
-            waitingNode = waitingNode->previous;
-        }
-    }
 }
 
 static void Watchdog_Timer0_Init(void)
@@ -93,7 +39,7 @@ static inline void Watchdog_Timer0_Restart(void)
     WATCHDOG0_LOAD_R = 0x1000060;
 }
 
-static void SysTick_Init(void)
+static inline void SysTick_Init(void)
 {
     NVIC_ST_CTRL_R = 0;
     NVIC_ST_RELOAD_R = 0x00FFFFFF;
@@ -106,26 +52,28 @@ void SysTick_Start(void)
     NVIC_ST_CTRL_R = 0x07;
 }
 
-void SysTick_Handler(void)
+static inline void kaOS_SysClock_Init(const enum SysClock sysclock)
 {
-    // SysTick timer interrupt handler
-    // Priority 2
+    // Override some fields of RCC register with RCC2 for additional features (set SYSCTL_RCC2_USERCC2)
+    // Bypass PLL during initializing it (set SYSCTL_RCC2_BYPASS2)
+    // Use 400 MHz PLL (set SYSCTL_RCC2_DIV400)
+    SYSCTL_RCC2_R |= 0xC0000800;
 
-    Watchdog_Timer0_Restart();
-    NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
+    SYSCTL_RCC_R = (SYSCTL_RCC_R & ~SYSCTL_RCC_XTAL_M) | SYSCTL_RCC_XTAL_16MHZ;   // Select 16 MHz crystal
+    SYSCTL_RCC2_R = (SYSCTL_RCC2_R & ~SYSCTL_RCC2_OSCSRC2_M) | SYSCTL_RCC2_OSCSRC2_MO;  // Set main oscillator as source
+
+    SYSCTL_RCC2_R &= ~SYSCTL_RCC2_PWRDN2;   // Activate PLL by clearing PWRDN
+    SYSCTL_RCC2_R = (SYSCTL_RCC2_R & ~0x1FC00000) | (sysclock << 22);  // Set the system divider (Sysdiv2)
+
+    while((SYSCTL_RIS_R & SYSCTL_RIS_PLLLRIS) == 0);    // Wait for the PLL to lock by polling PLLLRIS
+
+    SYSCTL_RCC2_R &= ~SYSCTL_RCC2_BYPASS2;  // Enable PLL by clearing BYPASS
+    //clockFrequency = 400000000 / divisor;
 }
 
-void Scheduler(void) {
-    if(RunPt != 0 && RunPt->next == 0)
-        RunPt = 0;
-    while(RunPt == 0)
-        __asm__ volatile("CPSIE I\n\tWFI\n\tCPSID I");
-
-    RunPt = RunPt->next;
-}
-
-void kaOS_Init(void)
+void kaOS_Init(const enum SysClock sysclock)
 {
+    kaOS_SysClock_Init(sysclock);
     SysTick_Init();
     Watchdog_Timer0_Init();
     Timer0_Init(0x00FFFFFF);
@@ -199,55 +147,4 @@ void kaOS_Suspend(void)
 void kaOS_Sleep(const uint32_t ms)
 {
     __asm__ volatile("SVC 4");
-}
-
-static void SVCall_kaOS_Sleep(const uint32_t ms)
-{
-    __asm__ volatile("CPSID I");
-    if(RunPt == RunPt->next)
-        RunPt->next = 0;
-    else
-    {
-        RunPt->previous->next = RunPt->next;
-        RunPt->next->previous = RunPt->previous;
-    }
-
-    RunPt->previous = 0;
-    RunPt->waitTime = ms;
-
-    if(WaitPt == 0)
-    {
-        WaitPt = RunPt;
-        TIMER0_CTL_R |= 1;   // Start Timer0
-    }
-    else
-    {
-        tcb_t* node = WaitPt;
-
-        while(node->previous != 0)
-            node = node->previous;
-
-        node->previous = RunPt;
-    }
-
-    NVIC_ST_CURRENT_R = NVIC_ST_RELOAD_R;
-    NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
-    __asm__ volatile("CPSIE I");
-}
-
-void SVCaller(void *param0, void* param1, void* param2, const uint8_t SVCall_Number) {
-    if(SVCall_Number == 0)
-        sem_init((sem_t*)param0, (int32_t)param1);
-    else if(SVCall_Number == 1)
-        sem_signal((sem_t*)param0);
-    else if(SVCall_Number == 2)
-        sem_wait((sem_t*)param0);
-    else if(SVCall_Number == 3) {
-        __asm__ volatile("CPSID I");
-        NVIC_ST_CURRENT_R = NVIC_ST_RELOAD_R;
-        NVIC_INT_CTRL_R |= NVIC_INT_CTRL_PEND_SV;
-        __asm__ volatile("CPSIE I");
-    }
-    else if(SVCall_Number == 4)
-        SVCall_kaOS_Sleep((uint32_t)param0);
 }

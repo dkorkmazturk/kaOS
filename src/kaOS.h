@@ -3,7 +3,7 @@
 
 #include "types.h"
 
-void kaOS_Init(void);
+void kaOS_Init(const enum SysClock sysclock);
 extern void kaOS_Start(void);
 int8_t kaOS_AddThead(void(*thread)(void));
 void kaOS_SemInit(sem_t* const sem, const int32_t val);
