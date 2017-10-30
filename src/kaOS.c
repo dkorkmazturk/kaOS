@@ -1,6 +1,4 @@
-#include <stdlib.h>
 #include "kaos.h"
-#include "semaphore.h"
 
 tcb_t* RunPt = 0;
 tcb_t* WaitPt = 0;
