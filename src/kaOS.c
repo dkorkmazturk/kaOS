@@ -1,8 +1,9 @@
 #include "kaos.h"
+#include <stdlib.h>
 
 tcb_t* RunPt = 0;
 tcb_t* WaitPt = 0;
-static uint32_t clockFrequency = 0;
+static uint32_t sysClockFrequency = 0;
 
 static inline void Timer0_Init(const uint32_t period)
 {
@@ -66,7 +67,8 @@ static inline void kaOS_SysClock_Init(const enum SysClock sysclock)
     while((SYSCTL_RIS_R & SYSCTL_RIS_PLLLRIS) == 0);    // Wait for the PLL to lock by polling PLLLRIS
 
     SYSCTL_RCC2_R &= ~SYSCTL_RCC2_BYPASS2;  // Enable PLL by clearing BYPASS
-    //clockFrequency = 400000000 / divisor;
+
+    sysClockFrequency = 400000000 / (sysclock + 1);
 }
 
 void kaOS_Init(const enum SysClock sysclock)
@@ -76,6 +78,51 @@ void kaOS_Init(const enum SysClock sysclock)
     Watchdog_Timer0_Init();
     Timer0_Init(0x00FFFFFF);
 }
+
+//int8_t kaOS_AddThead(void (*thread)(void))
+//{
+//    static uint8_t index = 0;
+//    static uint32_t stacks[4][STACKSIZE];
+//    static tcb_t tcbs[4];
+//
+//    stacks[index][STACKSIZE - 1] = 0x01000000;  // PSR
+//    stacks[index][STACKSIZE - 2] = (uint32_t)thread; // PC
+//    stacks[index][STACKSIZE - 3] = 0x14141414;  // LR (R14)
+//    stacks[index][STACKSIZE - 4] = 0x12121212;  // R12
+//    stacks[index][STACKSIZE - 5] = 0x03030303;  // R3
+//    stacks[index][STACKSIZE - 6] = 0x02020202;  // R2
+//    stacks[index][STACKSIZE - 7] = 0x01010101;  // R1
+//    stacks[index][STACKSIZE - 8] = 0x00000000;  // R0
+//    stacks[index][STACKSIZE - 9] = 0x11111111;  // R11
+//    stacks[index][STACKSIZE - 10] = 0x10101010; // R10
+//    stacks[index][STACKSIZE - 11] = 0x09090909; // R9
+//    stacks[index][STACKSIZE - 12] = 0x08080808; // R8
+//    stacks[index][STACKSIZE - 13] = 0x07070707; // R7
+//    stacks[index][STACKSIZE - 14] = 0x06060606; // R6
+//    stacks[index][STACKSIZE - 15] = 0x05050505; // R5
+//    stacks[index][STACKSIZE - 16] = 0x04040404; // R4
+//
+//    tcbs[index].sp = &stacks[index][STACKSIZE - 16];
+//    tcbs[index].waitTime = 0;
+//
+//    if(RunPt == 0)
+//    {
+//        RunPt = &tcbs[index];
+//        RunPt->next = RunPt;
+//        RunPt->previous = RunPt;
+//    }
+//
+//    else {
+//        tcbs[index].previous = RunPt->previous;
+//        tcbs[index].next = RunPt;
+//
+//        RunPt->previous->next = &tcbs[index];
+//        RunPt->previous = &tcbs[index];
+//    }
+//
+//    ++index;
+//    return 0;
+//}
 
 int8_t kaOS_AddThead(void (*thread)(void))
 {
@@ -145,4 +192,9 @@ void kaOS_Suspend(void)
 void kaOS_Sleep(const uint32_t ms)
 {
     __asm__ volatile("SVC 4");
+}
+
+const uint32_t kaOS_GetSysClock(void)
+{
+    return sysClockFrequency;
 }

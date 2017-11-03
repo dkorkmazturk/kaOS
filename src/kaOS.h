@@ -13,5 +13,6 @@ void kaOS_UART_Init(const enum UART uart, const uint32_t bps);
 void kaOS_UART_End(const enum UART uart);
 void kaOS_Suspend(void);
 void kaOS_Sleep(const uint32_t ms);
+const uint32_t kaOS_GetSysClock(void);
 
 #endif
