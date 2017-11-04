@@ -1,4 +1,4 @@
-#include "kaos.h"
+#include "kaOS.h"
 #include <stdlib.h>
 
 tcb_t* RunPt = 0;
