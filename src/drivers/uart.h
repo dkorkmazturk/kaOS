@@ -18,4 +18,4 @@ void UART_RecvBuf(const enum UART uart, char *str, const uint32_t strlen);
 void UART_RecvStr(const enum UART uart, char *str, const uint32_t strlen);
 void UART_End(const enum UART uart);
 
-#endif /* UART_H_ */
+#endif
