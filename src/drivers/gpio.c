@@ -7,7 +7,7 @@
 #include "gpio.h"
 #include "kaOS.h"
 
-static sem_t gpioMutex[] = {{1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}};
+sem_t gpioMutex[6] = {{1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}};
 
 static inline uint32_t getMutexIndex(const enum GPIO_PORT port)
 {
