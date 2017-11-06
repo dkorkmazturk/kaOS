@@ -35,14 +35,40 @@ void GPIO_SetMode(const enum GPIO_PORT port, const uint32_t pins, const enum GPI
     register uint32_t mutexIndex = getMutexIndex(port);
     kaOS_SemWait(&gpioMutex[mutexIndex]);
 
-    if(mode == GPIO_INPUT)
+    if(mode >= GPIO_INPUT)
+    {
         *((&GPIO_PORTA_DIR_R) + port) &= ~pins;
+
+        if(mode == GPIO_INPUT_PULLDOWN)
+        {
+            *((&GPIO_PORTA_PUR_R) + port) &= ~pins;
+            *((&GPIO_PORTA_PDR_R) + port) |= pins;
+        }
+
+        else if(mode == GPIO_INPUT_PULLUP)
+        {
+            *((&GPIO_PORTA_PDR_R) + port) &= ~pins;
+            *((&GPIO_PORTA_PUR_R) + port) |= pins;
+        }
+
+        else
+        {
+            *((&GPIO_PORTA_PDR_R) + port) &= ~pins;
+            *((&GPIO_PORTA_PUR_R) + port) &= ~pins;
+        }
+    }
+
     else
+    {
+        *((&GPIO_PORTA_PDR_R) + port) &= ~pins;
+        *((&GPIO_PORTA_PUR_R) + port) &= ~pins;
         *((&GPIO_PORTA_DIR_R) + port) |= pins;
+    }
 
     *((&GPIO_PORTA_DATA_R) + port) &= ~pins;
     *((&GPIO_PORTA_AMSEL_R) + port) &= ~pins;
     *((&GPIO_PORTA_AFSEL_R) + port) &= ~pins;
+    *((&GPIO_PORTA_ODR_R) + port) &= ~pins;
     *((&GPIO_PORTA_DEN_R) + port) |= pins;
 
     kaOS_SemSignal(&gpioMutex[mutexIndex]);
@@ -56,3 +82,5 @@ void GPIO_Write(const enum GPIO_PORT port, const uint32_t pins, const uint32_t v
     *((&GPIO_PORTA_DATA_R) + port) = (*((&GPIO_PORTA_DATA_R) + port) & ~pins) | (pins & values);
     kaOS_SemSignal(&gpioMutex[mutexIndex]);
 }
+
+
