@@ -8,8 +8,6 @@
 .global SVCall_Handler
 .global kaOS_Start
 
-.text
-
 // SVC #0 ==> Sem_Init
 // SVC #1 ==> Sem_Signal
 // SVC #2 ==> Sem_Wait
@@ -49,6 +47,7 @@ PendSV_Handler:
     MSR PSP, R0         // Load value of R0 into PSP
 
     CPSIE I             // Enable interrupts
+    MOV LR, #0xFFFFFFFD // Temporary workaround
     BX LR               // Branch to LR
 
 .thumb_func
