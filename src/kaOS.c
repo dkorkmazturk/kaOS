@@ -102,8 +102,9 @@ int8_t kaOS_AddThead(void (*thread)(void))
     newThread->stack[STACKSIZE - 14] = 0x06060606; // R6
     newThread->stack[STACKSIZE - 15] = 0x05050505; // R5
     newThread->stack[STACKSIZE - 16] = 0x04040404; // R4
+    newThread->stack[STACKSIZE - 17] = 0xFFFFFFFD; // FPU usage indication
 
-    newThread->sp = &(newThread->stack[STACKSIZE - 16]);
+    newThread->sp = &(newThread->stack[STACKSIZE - 17]);
     newThread->waitTime = 0;
 
     if(RunPt == 0)
