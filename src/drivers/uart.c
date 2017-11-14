@@ -6,7 +6,7 @@
 
 #include "uart.h"
 #include "gpio.h"
-#include "kaOS.h"
+#include "../kaOS.h"
 
 extern sem_t gpioMutex[6];
 static sem_t UARTMutex[] = {{1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}};    // These are used while setting up or using specific UART module

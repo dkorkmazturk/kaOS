@@ -5,7 +5,7 @@
  */
 
 #include "gpio.h"
-#include "kaOS.h"
+#include "../kaOS.h"
 
 sem_t gpioMutex[6] = {{1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}, {1, 0}};
 

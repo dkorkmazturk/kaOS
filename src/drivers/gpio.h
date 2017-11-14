@@ -7,7 +7,7 @@
 #ifndef GPIO_H_
 #define GPIO_H_
 
-#include "types.h"
+#include "../types.h"
 
 void GPIO_Init(const enum GPIO_PORT port);
 void GPIO_SetMode(const enum GPIO_PORT port, const uint32_t pins, const enum GPIO_MODE mode);

@@ -7,7 +7,7 @@
 #ifndef UART_H_
 #define UART_H_
 
-#include "types.h"
+#include "../types.h"
 
 void UART_Init(const enum UART uart, const uint32_t bps);
 void UART_SendChar(const enum UART uart, const char data);
