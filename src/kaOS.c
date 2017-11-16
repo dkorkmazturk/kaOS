@@ -1,9 +1,9 @@
 #include "kaOS.h"
-#include <stdlib.h>
 
 tcb_t* RunPt = 0;
 tcb_t* WaitPt = 0;
 static uint32_t sysClockFrequency = 0;
+static tcb_t pages[MAX_THREADS] = {0};
 
 static inline void Timer0_Init(const uint32_t period)
 {
@@ -77,11 +77,23 @@ void kaOS_Init(const enum SysClock sysclock)
     SysTick_Init();
     Watchdog_Timer0_Init();
     Timer0_Init(0x00FFFFFF);
+
+    for(uint8_t i = 0; i < MAX_THREADS; ++i)
+        pages[i].sp = (void*)0xDEADDEAD;
 }
 
 int8_t kaOS_AddThead(void (*thread)(void))
 {
-    tcb_t* newThread = malloc(sizeof(tcb_t));
+    tcb_t* newThread = 0;
+
+    for(uint8_t i = 0; i < MAX_THREADS; ++i)
+    {
+        if(pages[i].sp == (void*)0xDEADDEAD)
+        {
+            newThread = &pages[i];
+            break;
+        }
+    }
 
     if(newThread == 0)
         return -1;
