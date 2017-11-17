@@ -1,5 +1,5 @@
 # kaOS
-A {chaotic} operating system that written for **TI TM4C123GXL** *(ARM Cortex-M4F)* in order to grasp every aspects of the MCU.
+A *{chaotic}* operating system that written for **TI TM4C123GXL** *(ARM Cortex-M4F)* in order to grasp every aspects of the MCU.
 
 ## What I have done so far
 * Seperated user and kernel modes and seperated stack pointers for those modes.
@@ -15,4 +15,4 @@ A {chaotic} operating system that written for **TI TM4C123GXL** *(ARM Cortex-M4F
 * More testing
 
 ## License
-This project is licensed under the GPLv3 License - see the LICENSE.md file for details.
+This project is licensed under the GPLv3 License - see the LICENSE file for details.
