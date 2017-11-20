@@ -5,7 +5,7 @@ tcb_t* WaitPt = 0;
 static uint32_t sysClockFrequency = 0;
 static tcb_t pages[MAX_THREADS] = {0};
 
-static inline void Timer0_Init(const uint32_t period)
+static void Timer0_Init(const uint32_t period)
 {
     SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R0;
 
@@ -76,7 +76,7 @@ void kaOS_Init(const enum SysClock sysclock)
     kaOS_SysClock_Init(sysclock);
     SysTick_Init();
     Watchdog_Timer0_Init();
-    Timer0_Init(0x00FFFFFF);
+    Timer0_Init(0.001f / (1.0f / sysClockFrequency) - 10);
 
     for(uint8_t i = 0; i < MAX_THREADS; ++i)
         pages[i].sp = (void*)0xDEADDEAD;
