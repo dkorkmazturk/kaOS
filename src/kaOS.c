@@ -5,7 +5,7 @@ tcb_t* WaitPt = 0;
 static uint32_t sysClockFrequency = 0;
 static tcb_t pages[MAX_THREADS] = {0};
 
-static void Timer0_Init(const uint32_t period)
+static inline void Timer0_Init(const uint32_t period)
 {
     SYSCTL_RCGCTIMER_R |= SYSCTL_RCGCTIMER_R0;
 
