@@ -8,9 +8,16 @@
 #include <hal/i2c.h>
 #include "../kaOS.h"
 
+enum I2C_Mode {I2C_Transmit = 0, I2C_Receive = 1};
+
 extern sem_t gpioMutex[6];
 static sem_t I2CMutex[4] = {{1, 0}, {1, 0}, {1, 0}, {1, 0}};    // These are used while setting up or using specific I2C module
 static sem_t I2CClockMutex = {1, 0};
+
+static inline void setTargetSlave(const enum I2C i2c, const uint8_t addr, const enum I2C_Mode mode)
+{
+    *((&I2C0_MSA_R) + i2c) = (addr << 1) | mode;
+}
 
 void I2C_InitAsMaster(const enum I2C i2c, const enum I2C_Clock clock)
 {
@@ -74,14 +81,11 @@ void I2C_InitAsMaster(const enum I2C i2c, const enum I2C_Clock clock)
     *((&I2C0_MTPR_R) + i2c) = (clock <= I2C_1MHz ? (kaOS_GetSysClock() / (20 * clock)) - 1 : 0x80 | ((kaOS_GetSysClock() / (20 * clock)) - 1));
 }
 
-void I2C_BeginTransmission(const enum I2C i2c, const uint8_t slaveAddress)
-{
-    *((&I2C0_MSA_R) + i2c) = slaveAddress << 1; // Set receiver slave address and transmit mode.
-}
-
-bool I2C_SendChar(const enum I2C i2c, const uint8_t data)
+bool I2C_SendChar(const enum I2C i2c, const uint8_t slaveAddr, const uint8_t data)
 {
     kaOS_SemWait(&I2CMutex[i2c / 0x400]);
+    setTargetSlave(i2c, slaveAddr, I2C_Transmit);
+
     *((&I2C0_MDR_R) + i2c) = data;
 
     while(((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_BUSBSY) != 0); // If bus is busy, wait
@@ -94,14 +98,16 @@ bool I2C_SendChar(const enum I2C i2c, const uint8_t data)
     return ((*((&I2C0_MCS_R) + i2c)) & 0x02);
 }
 
-bool I2C_SenBuf(const enum I2C i2c, const uint8_t* data, uint32_t dataLen)
+bool I2C_SendBuf(const enum I2C i2c, const uint8_t slaveAddr, const uint8_t* data, uint32_t dataLen)
 {
     kaOS_SemWait(&I2CMutex[i2c / 0x400]);
+
     if(dataLen == 1)
-        return I2C_SendChar(i2c, *data);
+        return I2C_SendChar(i2c, slaveAddr, *data);
 
     else if(data != 0)
     {
+        setTargetSlave(i2c, slaveAddr, I2C_Transmit);
         *((&I2C0_MDR_R) + i2c) = *(data++);
         --dataLen;
 
@@ -143,7 +149,7 @@ bool I2C_SenBuf(const enum I2C i2c, const uint8_t* data, uint32_t dataLen)
     return true;
 }
 
-bool I2C_SendStr(const enum I2C i2c, const char* str)
+bool I2C_SendStr(const enum I2C i2c, const uint8_t slaveAddr, const char* const str)
 {
     register uint32_t _strlen = 0;
     register const char* ptr = str;
@@ -154,5 +160,47 @@ bool I2C_SendStr(const enum I2C i2c, const char* str)
         ++_strlen;
     }
 
-    return I2C_SenBuf(i2c, (uint8_t*)str, _strlen);
+    return I2C_SendBuf(i2c, slaveAddr, (uint8_t*)str, _strlen);
+}
+
+void I2C_Request(const enum I2C i2c, const uint8_t slaveAddr, uint32_t quantity, uint8_t* readBuf)
+{
+    if(quantity == 0)
+        return;
+
+    kaOS_SemWait(&I2CMutex[i2c / 0x400]);
+    setTargetSlave(i2c, slaveAddr, I2C_Receive);
+
+    while(((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_BUSBSY) != 0); // If bus is busy, wait
+
+    *((&I2C0_MCS_R) + i2c) = 0b01011; // I2C_MCS_START | I2C_MCS_RUN | I2C_MCS_ACK
+
+    while(quantity > 1)
+    {
+        while(((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_BUSY) != 0); // Wait while busy
+
+        if((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_ERROR)     // If there is an error
+        {
+            if(((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_ARBLST) == 0)
+                *((&I2C0_MCS_R) + i2c) = I2C_MCS_STOP;
+
+            kaOS_SemSignal(&I2CMutex[i2c / 0x400]); // I wish I had std::lock_guard
+            return;
+        }
+
+        *readBuf = (uint8_t)*((&I2C0_MDR_R) + i2c);
+        ++readBuf;
+        --quantity;
+
+        *((&I2C0_MCS_R) + i2c) = 0b01001;
+    }
+
+    *((&I2C0_MCS_R) + i2c) = 0b00101;
+
+    while(((*((&I2C0_MCS_R) + i2c)) & I2C_MCS_BUSY) != 0); // Wait while busy
+
+    if((*(((&I2C0_MCS_R) + i2c)) & I2C_MCS_ERROR) == 0)     // If there is no error
+        *readBuf = (uint8_t)*((&I2C0_MDR_R) + i2c);
+
+    kaOS_SemSignal(&I2CMutex[i2c / 0x400]);
 }
