@@ -2,7 +2,7 @@
 A *{chaotic}* operating system that written for **TI TM4C123GXL** *(ARM Cortex-M4F)* in order to grasp every aspects of the MCU.
 
 ## What I have done so far
-* Seperated user and kernel modes and seperated stack pointers for those modes.
+* Separated user and kernel modes and separated stack pointers for those modes.
 * Round-Robin context switch using SysTick & PendSV
 * System calls implemented via supervisor calls (SVC)
 * Semaphores
